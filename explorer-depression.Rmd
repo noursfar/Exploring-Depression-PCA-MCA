@@ -1,0 +1,479 @@
+---
+title: "Explorer la dépression"
+author: "Nour Sfar"
+date: "2023-04-29"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# I. Introduction:
+La dépression est un trouble de santé mentale fréquent qui affecte des millions de personnes à travers le monde. Cette maladie peut causer des symptômes tels que la tristesse persistante, la perte d'intérêt pour les activités quotidiennes, la fatigue, l'insomnie et l'anxiété. La dépression peut avoir des conséquences graves sur la vie des individus, notamment en affectant leurs relations interpersonnelles, leur capacité à travailler et leur bien-être généra… Dans ce cadre, 127  personnes,âgées de 17 ans au plus que 40 ans, ont été interrogés.
+
+ - Objectif : 
+L’ACP (Analyse en composantes principales) et l’ACM (Analyse des Correspondances Multiples) sont des méthodes pertinentes pour l’analyse des données et la statistique multivariée. On va adopter ces méthodes pour analyser notre base de donnée. Puis faire une classification pour expliquer la carte des individus.
+
+# II. Découvrir la base de données:
+La base de données "Explorerla Depression" est construite à partir d’un questionnaire destiné à des individus ayant des différentes catégories socio-professionnelles et plusieurs classes d’âge. Les données contiennet principalement.
+Le questionnaire, entièrement anonymisé, était décomposé en différentes questions:
+
+ - Colonne1 :est une variable qualitative qui représente le sexe.
+ - Colonne2 : est une variable qualitative ordinale qui représente les classes d’âge.
+ - Colonne 3 à 5 : se sont des variables qualtitatives qui représentent la classe socio-professionnelle, type de lycée(pour les lycéens) et filière d'étude(pour les etudiants).
+ 
+Le reste des colonnes sont partitionné en quatres blocs:
+
+ - Deux blocs de variables ont été obtenus à partir de questions à réponse binaire (oui/non).
+ - Deux blocs de variables comportant soit des symptômes, soit des habitudes ont été obtenus à partir d'une échelle de Likert graduée de 1 à 5.
+
+Le tableau de données contient 127 observations et 45 colonnes.
+
+
+```{r, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(FactoMineR)
+library(corrplot)
+library(RColorBrewer)
+library(factoextra)
+```
+
+# 1. Importer et préparer le jeu de données:
+
+```{r}
+df<-read_csv("Explorer La Dépression.csv", show_col_types = FALSE)
+names(df)=c("submission_time","genre","âge","CSP","Type_lycée","Filière_étude",
+            "Dépression_ressentie","Dépression_diagnostiquée",
+            "Consultation_dépression","Antécédents_familiaux_dépression",
+            "Maladie_physique","Antécédents_stress","Changements_alimentaires",
+            "Troubles_sommeil","Fatigue/mnq_energie","Manque_motivation",
+            "Difficulté_concentration","Sentiments_culpabilité/dévalorisation",
+            "Perte_confiance-soi","Idées_suicidaires","Trouble_humeur",
+            "Agitation/Ralentissement_Psychomoteur","Sentiments_vide/solitude",
+            "Désintérêt_activités","Douleurs_inexpliqués","Problèmes_mémoire",
+            "Sentiments_désespoir","Manque_émotions","Appétit_poids",
+            "Isolement_social","TOC","Perte_intérêt/plaisir","Vidéos_démotivantes",
+            "Traitement_médical","Fumer","Buver_alcool","Cons_drogue",
+            "Diff_financières/logement","Traitement+effets_secondaires",
+            "Diff_relationnelles/familiales","diff_scolaires/professionnelles",
+            "Problèmes_santé_physique", "Arrêt_relation_amoureuse","Accident",
+            "Evénement_stressant","Troubles_stress","comments")
+df[df=="Jamais"]<-'0'
+df[df=="Rarement"]<-'1'
+df[df=="Parfois"]<-'2'
+df[df=="fréquemment"]<-'3'
+df[df=="Fréquemment"]<-'3'
+df[df=="Presque toujours"]<-'4'
+bloc1<-df[,13:32]
+bloc2<-df[,33:42]
+sapply(bloc1, class)
+sapply(bloc2, class)
+bloc1<-sapply(bloc1, as.numeric)
+bloc2<-sapply(bloc2, as.numeric)
+bloc1<-as.data.frame(bloc1)
+bloc2<-as.data.frame(bloc2)
+```
+
+# 2. Analyse Descriptiv des Données:
+
+### 2.1. Répartition par genre:
+```{r}
+df$genre <-  factor(df$genre, levels = c('Homme', 'Femme'))
+#Plot Homme/Femme
+p1 <- plot(df$genre, main = 'Distribution des Genres', xlab = 'genre', ylab = 'count', col = c('cornflowerblue', 'indianred1'))
+text(p1[,1],table(df$genre)-1,table(df$genre))
+
+#Camembert Homme/Femme
+df['genre'] %>%
+  group_by(genre) %>%
+  summarize(count = n()) -> d
+pct = d$count / sum(d$count) * 100
+p2 <- pie(d$count, labels = paste(d$genre,' ', round(pct, 2), '%' ), col = c('cornflowerblue', 'indianred1'),
+          main = 'Distribution des Genres')
+```
+
+**Interprétation :**
+
+- A l'issue de ce questionnaire, on a 60.32% des réponses sont des femmes (76 femmes), 39.68% sont des Hommes (50 hommes).
+
+### 2.2. Répartition par âge :
+```{r}
+#Camembert âges
+df['âge'] %>%
+  group_by(âge) %>%
+  summarize(count = n()) -> d
+pct = d$count / sum(d$count) * 100
+p4 <- pie(d$count, labels = paste(d$âge,' ', round(pct, 2), '%' ), col = c('moccasin', 'olivedrab2', 'lightgoldenrod4','lightsalmon4'),
+          main = 'Distribution des âges')
+```
+
+**Interprétation : **
+
+- On remarque que la tranche d'âge majoritaire dans notre échantillon est du 20 ans à 25 ans.
+
+### 2.3. Répartition par catégorie socioprofessionnelle :
+```{r}
+#Plot CSP
+ll=c("étudiant(e)","à la recherche d'un emploi","lycéen(ne)","étudiant(e)+ employé(e) à mi-temps","retraité(e)","employé(e) ")
+df$CSP <- factor(df$CSP, levels = unique(df$CSP))
+p5 <- plot(df$CSP, main = 'Distribution des CSP', xlab = 'status', ylab = 'count', col = c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'))
+text(p5[,1],table(df$CSP)-1,table(df$CSP))
+legend(x="top",legend=ll,fill=c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'),bty="n")
+
+#Camembert CSP
+df['CSP'] %>%
+  group_by(CSP) %>%
+  summarize(count = n()) -> d
+pct = d$count / sum(d$count) * 100
+p6 <- pie(d$count, labels = paste(d$CSP,' ', round(pct, 2), '%' ), col = c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'),
+          main = 'CSP')
+```
+
+**Interprétation :**
+
+- Les Etudiants sont les majoritaires dans notre échantillon avec un ratio qui dépasse les 80% des individus le l'échantillon.
+
+### 2.4. Répartition des étudiants par filière d'étude :
+```{r}
+#Plot Filière_étude
+ll=c("Ecole d'ingénieur","Licence","Pharmacie","Médecine","Master","Préparatoire","sport")
+db <- df %>%
+  filter(Filière_étude != '')
+db$Filière_étude <- factor(db$Filière_étude, levels = unique(db$Filière_étude))
+p7 <- plot(db$Filière_étude, main = 'Distribution des Filière_étude', xlab = 'status', ylab = 'count', col = c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'),ylim=c(0,60))
+legend(x="top",legend=ll,fill=c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'),bty="n")
+text(p7[,1],table(db$Filière_étude)-1,table(db$Filière_étude))
+
+#Camembert Filière_étude
+df['Filière_étude'] %>%
+  group_by(Filière_étude) %>%
+  summarize(count = n()) -> d
+pct = d$count / sum(d$count) * 100
+p8 <- pie(d$count, labels = paste(d$Filière_étude,' ', round(pct, 2), '%' ), col = c('coral2', 'aquamarine3', 'dodgerblue2', 'yellow', 'azure3', 'brown3', 'gray43'),
+          main = 'Filière_étude')
+```
+
+**Interprétation :**
+
+- On remarque que la filière qui perciste dans notre échantillon c'est le cycle ingénieur (Préparatoire + Ecole d'ing) avec un ratio qui dépasse les 60% de l'échantillon.
+- 15.87% des individus de notre échantillon sont pas des étudiants.
+
+### 2.5. Quelques Comportement des individus :
+```{r}
+l1 <- list(medium = rep(c("Dépression_ressentie", "Dépression_diagnostiquée", "Consultation_dépression", "Antécédents_familiaux_dépression", "Maladie_physique","Antécédents_stress"),
+                       each = length(df[,1])), res = c(df$Dépression_ressentie, df$Dépression_diagnostiquée, df$Consultation_dépression,
+                                                         df$Antécédents_familiaux_dépression, df$Maladie_physique, df$Antécédents_stress))
+data1 <- data.frame(l1)
+ggplot(data1, aes(medium, fill = res)) +
+  geom_bar(position = 'dodge') +
+  labs(title = 'Quelque Symptomes', x = 'medium') +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.5)
+  ) -> p9
+p9
+```
+
+### 2.6. Quelques événements peuvent arriver aux individus :
+```{r}
+l2 <- list(medium = rep(c("Arrêt_relation_amoureuse", "Accident", "Evénement_stressant", "Troubles_stress"),
+                        each = length(df[,1])), res = c(df$Arrêt_relation_amoureuse, df$Accident, df$Evénement_stressant,df$Troubles_stress))
+data2 <- data.frame(l2)
+ggplot(data2, aes(medium, fill = res)) +
+  geom_bar(position = 'dodge') +
+  labs(title = 'Quelques événements peuvent arriver aux individus', x = 'medium') +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.5)
+  ) -> p10
+p10
+```
+
+
+# III. ACP et son interprétation :
+
+- L'ACP est une technique d'analyse multivariée qui permet de réduire la dimensionnalité d'un ensemble de variables tout en préservant au maximum l'information qu'elles contiennent. 
+
+- Dans notre cas l'ACP pourrait être utilisée pour identifier les variables qui sont les plus importantes pour décrire les symptômes de la dépression et pour trouver des groupes de symptômes qui se regroupent souvent ensemble.
+
+## 1. But de l’ACP :
+
+Pourquoi la depression affecte les gens? Proposition d’une typologie des processus décisionnels et étude des variables d’influence. Cet ACP a pour but d’étudier les différents critères selon lesquels les consommateurs choisissent leurs romans puis les regrouper selon un rapport d’importance .
+
+- Variables : Regrouper les variables correlées et les remplacer par un petit nombre de nouvelles variables qui sont les composantes principales décrivant symptomes ou les causes de la dépression.
+- Individus : Regrouper les individus qui ont les mêmes symptômes ou mêmes habitues et indiquer les symptômes et les habitudes qui les caractérisent.
+
+**Remarque :**
+
+- On va ajouter les variables “sexe” et “age” comme variables qualitatives supplémentaires. Les variables illustratives n’influencent pas la construction des composantes principales de l’analyse.
+
+
+## 2. Pertinence de l’ACP:
+### 2.1. Critère 1: Le Corrplot:
+
+- Le corrgram donné ci-dessous permet d'étudier les corrélations entre les variables quantitatives.
+
+```{r}
+m1<-cor(bloc1)
+
+correlations <- corrplot(m1, type="upper", order="hclust", 
+                         col=brewer.pal(n=8, name="RdBu"),tl.cex = 0.3)
+
+res.pca=PCA(bloc1, ncp = 10, graph = F)
+```
+
+**Interprétation :**
+
+- Il est clair qu'il existe des corrélations importantes entre des groupes de variables ce qui suggère la pertinence de cette ACP.
+
+### 2.2. Critère 2: Les Valeurs Propres:
+
+```{r}
+val_prop <- res.pca$eig
+head(val_prop)
+```
+
+**Interprétation :**
+
+- Une valeur très élevée a été obtenue pour la première valeur propre.
+
+## 3. Choix du nombre d’axes à retenir :
+
+### 3.1 Crirère de Kaiser :
+
+```{r}
+val_prop[,1]
+```
+
+**Interprétation :**
+
+- On remarque qu'il y a 3 axes dont les valeurs propres sont supérieurs à 1 donc 2 on retient 2 axes d'après le critère de `Kaiser`.
+
+### 3.2 Critère du Taux d'Inertie Cumulée :
+
+```{r}
+val_prop[,3]
+```
+
+**Interprétation :**
+
+- On remarque que le `taux d'inertie cumulé` des deux premiers axes est de 57.06943% qui est un taux importantcompte tenu du fait que nous avons 20 variables : on va donc, d'parès le critère du taux d'inertie cumulé, rtenir les 2 premiers axes.
+
+### 3.3 Critère du Coude :
+
+```{r}
+fviz_screeplot(res.pca,addlabels=TRUE)
+```
+
+**Interprétation :**
+
+- On remarque que le coude se trouve au nivaux du du deuxième axe, d'après le `Critère du Coude`, on devrait retenir les 2 premiers axes. 
+
+### 3.4. Axes à retenir :
+
+- On peut conclure par vote des 3 criteres qu’on devrait retenir les `2 premiers axes`. 
+
+## 4. Interprétation de la carte des variables :
+### 4.1. Coordonnées des variables :
+- L’objet `var` de `res.pca` contient les 4 objets : `coord`, `cor`, `cos2` et `contrib`. 
+- A noter que vu que notre ACP est normée, cor (i.e. la corrélations d’une variable avec la composante principale d’un axe) est identique à coord (i.e. la coordonnée de cette variable sur cet axe).
+
+```{r}
+names(res.pca$var)
+```
+
+- L’objet `coord` dans `var` contient les coordonnées des variables.
+
+```{r}
+res.pca$var$coord[,1:3]
+```
+
+- L’objet `cos2` dans `var` est une matrice dont les lignes représentent le cos carrés de la variable (soit le carrée des coordonnées puisque l’ACP est normée).
+
+```{r}
+res.pca$var$cos2[,1:3]
+```
+
+### 4.2. Représentation de la Carte des variables :
+
+- La qualité de la représentation dépend de la grandeur cosinus carré, plus il est élevé plus on dit qu’un axe est bien représenté.
+
+```{r}
+fviz_pca_var(res.pca, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = T)
+```
+
+**Interprétation :**
+
+- les variables à faible valeur de cos2 seront colorées en “blanc”.
+- les variables avec les valeurs moyennes de cos2 seront colorées en “blue”.
+- les variables avec des valeurs élevées de cos2 seront colorées en “rouge”.
+- `Exemple:` Les cos² de **« Sentiments_désespoir »** et **« Perte_confiance-Soi »** sont élevés ce qui indique une bonne représentation des deux variables sur les axes principaux. Dans ce cas, ces variables sont positionnées à proximité de la circonférence du cercle de corrélation tandis que le cos² de **« Idées_Suicidaires »** est faible par rapport aux autres variables, d’où la variable est un peu proche du centre du cercle.
+
+- La variable **{Trouble_humeur}** est positivement corrélée a la variable **{Apétit_poids}**. L'individu qui des troubles d'humour est susceptible de d'aumenter ou diminuer sont appétit et sont poids.
+- La variable **{Douleurs inexpliqués}** est positivement corrélée a la variable **{TOC}**. l'individu qui a des des troubles obsessionnels-compulsifs susceptible d'avoir des douleurs inexpliqué . 
+
+### 4.3. Noms des axes :
+- Axe 1: symptômes de la dépression.
+- Axe 2: Facteurs de la dépression.
+```{r}
+fviz_pca_var(res.pca, col.var = "contrib", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = F)
+```
+
+- « Sentiments_désespoir » est la variable **qui contribue le plus** dans la définition des axes principaux.
+
+## 5. Itnterprétation de la carte des individus:
+
+- De la même manière, l’objet ind de res.pca contient les objets : coord, cos2 et contrib. 
+```{r}
+res.pca = PCA(bloc1, graph=F)
+plot(res.pca, choix="ind", cex=0.7)
+```
+
+```{r}
+quali.sup <- list(sexe = df$genre)
+fviz_pca_ind(res.pca, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = T,  quali.sup = quali.sup)
+```
+
+# IV. ACM et son interprétation :
+
+-  L'ACM, ou Analyse en Composantes Multiples, est également une technique d'analyse multivariée utilisée pour explorer les relations entre plusieurs variables. Contrairement à l'ACP, l'ACM est utilisée lorsque les variables sont catégorielles et non continues.
+
+- Dans notre contexte, l'objectif de l'Analyse en Composantes Multiples (ACM) pourrait être d'explorer les relations entre nos plusieurs variables catégorielles liées à la dépression, telles que l'âge, le sexe, le niveau d'éducation, la CSP, etc. En appliquant l'ACM, nous pouvons identifier les combinaisons de variables qui sont les plus fréquentes et voir comment elles sont associées à la dépression. Cela peut nous aider à mieux comprendre les facteurs de risque et les symptômes de la dépression chez différents groupes de personnes, ainsi qu'à identifier les tendances et les schémas généraux liés à la dépression.
+
+## 1. But de l’ACM :
+
+Résumer et visualiser le tableau de données contenant 6 tranches d'âge, 2 sexes et 6 types de CSP.
+L’objectif est d’identifier: 
+* Un groupe de personnes ayant un profil similaire dans leurs réponses aux questions.
+* Les associations entre les catégories des variables.
+
+```{r}
+bloc3<-df[,7:12]
+bloc3
+res.mca <- MCA (bloc3, graph = FALSE)
+```
+
+## 2. Visualisation et interprétation :
+
+```{r}
+res.mca$eig
+```
+- `m = 6` est le nombre de variables et `p = 2` est le nombre de modalités alors l’inertie totale de cette ACM est égale à 0.33.
+
+
+## 3. Nombre d’axes à retenir :
+
+### 3.1. Critère 1 :
+
+- Retenir les axes dont les valeurs propres sont supérieures à la moyenne soit 1/m = 0.166 donc les 2 premiers axes.
+
+### 3.2. Critère 2 :
+
+- Tracer le graphique des valeurs propres et noter que le coude se trouve au niveau du 2ème axe.
+
+```{r}
+fviz_screeplot(res.mca)
+```
+
+### 3.2. Critère 3 :
+
+- Raisonner sur le taux d’inertie cumulé et retenir les 2 premeiers axes qui, sur les 9 axes de l’ACM, accumulent quasi la moitié de l’inertie.
+
+**En conclusion, le choix des 2 premiers axes serait justifié.**
+
+## 4. Interprétation de la première carte des modalités :
+
+```{r}
+#Représentation de la première carte des modalités
+fviz_mca_var (res.mca,
+              repel = TRUE, 
+              ggtheme = theme_minimal ())
+```
+
+**Interprétation :**
+
+- Il suffit d'idetifier les groupes de modalités qui sont proches sur la cartes.
+- On a un premier groupe de modalités à gauche de la carte, constitué des modalités suivantes : Dépression_ressentie_Non et Antécédents_stress_Non. Ces modalités peuvent être interprétées comme indiquant les individus qui ne souffrent pas de dépression.
+- Un deuxième groupe de modalités se trouve à droite de la carte et est constitué des modalités suivantes : Dépression_diagnostiquée_oui, antécédent_Stress_oui, dépression_ressentie_oui. Ces modalités peuvent être interprétées comme indiquant les individus qui souffrent de dépression.
+- Un troisième groupe se trouve en haut de la carte et est constitué des modalités suivantes : Maladie_physique et Consultation_dépression. Ces modalités peuvent être interprétées comme indiquant les individus qui souffrent d'une maladie physique et ont tendance à consulter un psychiatre pour évaluer leur situation psychique, peut-être en raison de l'impact de la maladie physique sur leur santé mentale ou de la prise de médicaments associés à cette maladie.
+
+```{r}
+dimdesc(res.mca, axes=1:2, proba=0.05)$`Dim 1`
+```
+## 5. Interprétation de la première carte des individus : 
+
+```{r}
+#Représentation de la première carte des individus
+fviz_mca_biplot (res.mca,select.ind  = list(cos2 = 0.3),
+              repel = TRUE, 
+              ggtheme = theme_minimal ())
+```
+# V. Classification :
+
+## 1. Méthode Hiérarchique :
+
+- Les méthodes non hiérarchiques permettent de traiter des populations importantes (même 1000 et plus) à des coûts raisonnables. Ces méthodes visent à constituer directement k types à partir de n objets en essayant d’optimiser un indice global mesurant la qualité de la classification.
+
+### 1.1. Arbre Hiérarchique :
+
+- L'arbre hiérarchique est un outil d'analyse de données qui permet de regrouper des variables ou des individus en fonction de leurs similarités ou de leurs différences. Sur une carte factorielle, qui représente les résultats d'une analyse en composantes principales (ACP).
+
+#### 1.1.1. Afficher l'arbre :
+
+```{r}
+c<-dist(scale(bloc1),method="euclidean")
+h<- hclust(c, method="ward.D2")
+plot(h, hang = -1, cex =0.6)
+```
+
+#### 1.1.2. Choisir Les Classes :
+
+```{r}
+res.HCPC<-HCPC(res.pca, consol=TRUE, graph=F)
+plot.HCPC(res.HCPC,choice='tree', title ='Hierarchical tree')
+```
+
+**Conclusion :** on peut choisir `3 classes`.
+
+### 1.2. Arbre hiérarchique sur la carte factorielle :
+
+```{r}
+plot.HCPC(res.HCPC, choice = 'map', draw.tree=F, title ='Factor map')
+
+plot.HCPC(res.HCPC,choice = '3D.map', ind.names = FALSE, title='Hierarchial tree on the factor map')
+```
+
+
+## 2. Méthode non Hiérarchique :
+
+### 2.1. K-means :
+
+Ci-dessous, nous exposons comment effectuer une coloration par groupes d'individus. Nous démontrons également comment intégrer des ellipses de concentration et des ellipses de confiance pour chaque groupe.
+
+```{r}
+res.km <- eclust(bloc1, "kmeans",nstart = 25)
+```
+
+## 3. Description des classes par les variables : 
+
+- Cluster **"Bleu"** : Ce sont les individus qui ne souffrent presque pas des symptômes de dépression, on peut nommer la classe `Bonne santé mentale`.
+- Cluster **"Vert"** : Ce sont les individus qui souffrent presque toujours des symptômes de dépression, on peut nommer la classe `Situation Dépressive `.
+- Cluster **"Rouge"** : Ce sont les individus qui souffrent moyennement des symptômes de dépression, on peut nommé la classe `Pré-dépression`.
+
+## 4. Classification Automatique :
+
+### 4.1. Silhouette :
+
+```{r}
+fviz_silhouette(res.km)
+```
+
+
